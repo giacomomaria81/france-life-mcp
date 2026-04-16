@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <rect width="200" height="200" rx="32" fill="#1e293b"/>
+  <rect x="24" y="50" width="20" height="100" rx="4" fill="#3b82f6"/>
+  <rect x="44" y="50" width="20" height="100" rx="0" fill="#ffffff"/>
+  <rect x="64" y="50" width="20" height="100" rx="4" fill="#ef4444"/>
+  <text x="100" y="90" font-family="system-ui,sans-serif" font-size="28" font-weight="700" fill="#f8fafc" text-anchor="start">France</text>
+  <text x="100" y="120" font-family="system-ui,sans-serif" font-size="28" font-weight="700" fill="#f8fafc" text-anchor="start">Life</text>
+  <text x="26" y="175" font-family="system-ui,monospace" font-size="14" fill="#94a3b8">18 tools for daily life</text>
+</svg>
