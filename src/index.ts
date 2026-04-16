@@ -1,20 +1,8 @@
 #!/usr/bin/env node
-
-/**
- * France Life MCP — The first comprehensive MCP for daily life in France.
- *
- * 20 tools across 10 domains: weather, health, transport, schools, admin,
- * housing, calendar, address, prices, and business.
- *
- * All powered by free French government APIs + Open-Meteo.
- *
- * Author: Giacomo Pilia <giacomomaria@gmail.com>
- * License: MIT
- */
-
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import express from "express";
 import { registerAddressTools } from "./tools/address.js";
 import { registerWeatherTools } from "./tools/weather.js";
 import { registerCalendarTools } from "./tools/calendar.js";
@@ -26,33 +14,47 @@ import { registerHousingTools } from "./tools/housing.js";
 import { registerPricesTools } from "./tools/prices.js";
 import { registerBusinessTools } from "./tools/business.js";
 
-const server = new McpServer({
-  name: "france-life-mcp",
-  version: "1.0.0",
-});
-
-// Register all tool domains
-registerAddressTools(server);     // 2 tools: search_address, reverse_geocode
-registerWeatherTools(server);     // 3 tools: weather, air_quality, water_quality
-registerCalendarTools(server);    // 2 tools: public_holidays, school_holidays
-registerEducationTools(server);   // 1 tool:  search_schools
-registerHealthTools(server);      // 2 tools: search_doctors, find_pharmacies
-registerTransportTools(server);   // 2 tools: search_stations, transport_disruptions
-registerAdminTools(server);       // 1 tool:  search_public_services
-registerHousingTools(server);     // 3 tools: property_prices, natural_risks, energy_rating
-registerPricesTools(server);      // 1 tool:  fuel_prices
-registerBusinessTools(server);    // 1 tool:  search_companies
-
-// Total: 18 tools across 10 domains
-
-async function main(): Promise<void> {
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-  console.error("🇫🇷 France Life MCP started — 18 tools ready");
-  console.error("   Domains: address, weather, calendar, education, health, transport, admin, housing, prices, business");
+function createServer(): McpServer {
+  const server = new McpServer({ name: "france-life-mcp", version: "1.0.0" });
+  registerAddressTools(server);
+  registerWeatherTools(server);
+  registerCalendarTools(server);
+  registerEducationTools(server);
+  registerHealthTools(server);
+  registerTransportTools(server);
+  registerAdminTools(server);
+  registerHousingTools(server);
+  registerPricesTools(server);
+  registerBusinessTools(server);
+  return server;
 }
 
-main().catch((error) => {
-  console.error("Fatal error:", error);
-  process.exit(1);
-});
+async function runStdio(): Promise<void> {
+  const server = createServer();
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+  console.error("France Life MCP started (stdio) — 18 tools ready");
+}
+
+async function runHTTP(): Promise<void> {
+  const app = express();
+  app.use(express.json());
+  app.post('/mcp', async (req, res) => {
+    const server = createServer();
+    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
+    res.on('close', () => transport.close());
+    await server.connect(transport);
+    await transport.handleRequest(req, res, req.body);
+  });
+  app.get('/health', (_req, res) => {
+    res.json({ status: "ok", name: "france-life-mcp", version: "1.0.0", tools: 18 });
+  });
+  const port = parseInt(process.env.PORT || "3000");
+  app.listen(port, '0.0.0.0', () => {
+    console.error("France Life MCP started (HTTP) on port " + port);
+  });
+}
+
+const transport = process.env.TRANSPORT || "stdio";
+if (transport === "http") { runHTTP().catch(e => { console.error(e); process.exit(1); }); }
+else { runStdio().catch(e => { console.error(e); process.exit(1); }); }

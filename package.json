@@ -13,13 +13,23 @@
     "dev": "tsc --watch"
   },
   "keywords": [
-    "mcp", "france", "french-api", "model-context-protocol", "claude",
-    "ai-tools", "government-api", "daily-life", "expat", "open-data"
+    "mcp",
+    "france",
+    "french-api",
+    "model-context-protocol",
+    "claude",
+    "ai-tools",
+    "government-api",
+    "daily-life",
+    "expat",
+    "open-data"
   ],
   "author": "Giacomo Pilia <giacomomaria@gmail.com>",
   "license": "MIT",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",
+    "@types/express": "^5.0.6",
+    "express": "^5.2.1",
     "zod": "^3.25.24"
   },
   "devDependencies": {
@@ -29,5 +39,9 @@
   "engines": {
     "node": ">=18.0.0"
   },
-  "files": ["dist", "README.md", "LICENSE"]
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ]
 }
