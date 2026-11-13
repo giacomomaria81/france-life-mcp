@@ -131,18 +131,59 @@ Returns: latest water quality test results including compliance status, contamin
     },
     async (params) => {
       try {
-        const data = await apiFetch<Record<string, unknown>>({
+        // Hub'Eau: one row per measured parameter; rows of the same sample share its conclusion.
+        const data = await apiFetch<{ count?: number; data?: Array<Record<string, unknown>> }>({
           baseUrl: "https://hubeau.eaufrance.fr",
-          path: "/v1/qualite_eau_potable/resultats_dis",
+          path: "/api/v1/qualite_eau_potable/resultats_dis",
           params: {
             code_commune: params.commune_code,
-            size: 20,
+            size: 200,
             sort: "desc",
-            fields: "date_prelevement,resultat_numerique,libelle_parametre,conclusion_conformite_prelevement,reference_qualite_parametre,unite",
+            fields: "code_prelevement,date_prelevement,libelle_parametre,resultat_alphanumerique,libelle_unite,limite_qualite_parametre,reference_qualite_parametre,conclusion_conformite_prelevement,conformite_limites_bact_prelevement,conformite_limites_pc_prelevement,conformite_references_bact_prelevement,conformite_references_pc_prelevement,nom_commune,nom_distributeur,nom_uge",
           },
+          timeoutMs: 15000,
         });
-
-        return toolResult(data);
+        const rows = data.data || [];
+        if (rows.length === 0) {
+          return toolResult({
+            commune_code: params.commune_code,
+            error: "No tap water analysis found for this commune code.",
+            alternative: "https://sante.gouv.fr/sante-et-environnement/eaux/eau — official results by commune",
+          });
+        }
+        const flag = (v: unknown) => (v === "C" ? "compliant" : v === "N" ? "NOT compliant" : v === "D" ? "compliant by derogation" : v === "S" ? "not checked" : v ?? null);
+        const samples = new Map<string, Array<Record<string, unknown>>>();
+        for (const r of rows) {
+          const k = String(r.code_prelevement ?? r.date_prelevement);
+          if (!samples.has(k)) samples.set(k, []);
+          samples.get(k)!.push(r);
+        }
+        const wanted = /nitrates \(|chlore libre|chlore total|escherichia|ent[ée]rocoques|turbidit|ph |^ph$|conductivit|plomb|duret|titre hydrotim|temp[ée]rature de l'eau|pesticides|fluorures|aluminium|ammonium/i;
+        const latest = [...samples.values()].slice(0, 3).map((rs) => ({
+          date: String(rs[0].date_prelevement ?? "").slice(0, 10),
+          conclusion: rs[0].conclusion_conformite_prelevement,
+          bacteriological_limits: flag(rs[0].conformite_limites_bact_prelevement),
+          chemical_limits: flag(rs[0].conformite_limites_pc_prelevement),
+          bacteriological_references: flag(rs[0].conformite_references_bact_prelevement),
+          chemical_references: flag(rs[0].conformite_references_pc_prelevement),
+          measures: rs.filter((r) => wanted.test(String(r.libelle_parametre ?? ""))).slice(0, 14).map((r) => ({
+            parameter: r.libelle_parametre,
+            value: r.resultat_alphanumerique,
+            unit: r.libelle_unite && r.libelle_unite !== "SANS OBJET" ? r.libelle_unite : null,
+            limit: r.limite_qualite_parametre || r.reference_qualite_parametre || null,
+          })),
+        }));
+        return toolResult({
+          commune_code: params.commune_code,
+          commune: rows[0].nom_commune,
+          distributor: rows[0].nom_distributeur,
+          network: rows[0].nom_uge,
+          latest_sample_date: latest[0]?.date,
+          latest_conclusion: latest[0]?.conclusion,
+          samples: latest,
+          total_results_on_record: data.count,
+          source: "Hub'Eau — Ministère de la Santé, contrôle sanitaire de l'eau distribuée",
+        });
       } catch (error) {
         return toolError(error);
       }
